@@ -6,7 +6,6 @@ public class ConnectionsImpl<T> implements Connections<T> {
 
     private ConcurrentHashMap<Integer, ConnectionHandler<T>> activeClients = new ConcurrentHashMap<>();
 
-
     @Override
     public void connect(int connectionId, ConnectionHandler<T> handler){
         activeClients.put( connectionId , handler );

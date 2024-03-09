@@ -18,7 +18,7 @@ public class TftpProtocol implements BidiMessagingProtocol<byte[]>  {
 
     @Override
     public void process(byte[] message) {
-        shouldTerminate = message.equals("SOMETHING_TO_CHECK");
+        shouldTerminate = message.equals("SOMETHING_TO_CHECK".getBytes());
         // Integer[] ids = connections.getConnectionIds();
         connections.send(connectionId, message); // returns false
     }
