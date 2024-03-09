@@ -14,6 +14,7 @@ public class TftpEncoderDecoder implements MessageEncoderDecoder<byte[]> {
     public byte[] decodeNextByte(byte nextByte) {
 
         if(nextByte == 0) {
+            
             byte[] decodedMessage = new byte[bytes.size()];
             for(int i = 0; i < bytes.size(); i++)
                 decodedMessage[i] = (byte) bytes.get(i);
@@ -30,6 +31,7 @@ public class TftpEncoderDecoder implements MessageEncoderDecoder<byte[]> {
     public byte[] encode(byte[] message) { 
         //This method copies the values of the array into a new array with new size - 
         //padded with zeros if size is greater - zero byte is exactly our postfix separator.
-        return Arrays.copyOf(message, message.length + 1);
+        return Arrays.copyOf(message, message.length + 1); 
+        //CHECK MAYBE NOT NEED TO ADD THIS PREFIX AND JUST SEND THE PARAMETER AS IT IS
     }
 }

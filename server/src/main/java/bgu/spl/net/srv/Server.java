@@ -1,7 +1,7 @@
 package bgu.spl.net.srv;
 
 import bgu.spl.net.api.MessageEncoderDecoder;
-import bgu.spl.net.api.MessagingProtocol;
+import bgu.spl.net.api.BidiMessagingProtocol;
 import java.io.Closeable;
 import java.util.function.Supplier;
 
@@ -20,9 +20,9 @@ public interface Server<T> extends Closeable {
      * @param <T> The Message Object for the protocol
      * @return A new Thread per client server
      */
-    public static <T> Server<T>  threadPerClient(
+    public static <T> Server<T> threadPerClient(
             int port,
-            Supplier<MessagingProtocol<T> > protocolFactory,
+            Supplier<BidiMessagingProtocol<T> > protocolFactory,
             Supplier<MessageEncoderDecoder<T> > encoderDecoderFactory) {
 
         return new BaseServer<T>(port, protocolFactory, encoderDecoderFactory) {

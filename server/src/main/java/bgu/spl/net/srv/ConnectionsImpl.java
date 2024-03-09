@@ -4,7 +4,6 @@ import java.util.concurrent.ConcurrentHashMap;
 
 public class ConnectionsImpl<T> implements Connections<T> {
 
-    // private List<ConnectionHandler<T>> activeClients = new LinkedList<ConnectionHandler<T>>();
     private ConcurrentHashMap<Integer, ConnectionHandler<T>> activeClients = new ConcurrentHashMap<>();
 
 
@@ -28,5 +27,12 @@ public class ConnectionsImpl<T> implements Connections<T> {
     public void disconnect(int connectionId){
         activeClients.remove(connectionId);
     }
-    
+
+    // /**
+    //  * @return an array of the active clients' connection ids
+    //  */
+    // @Override
+    // public Integer[] getConnectionIds(){
+    //     return (Integer[]) activeClients.keySet().toArray();
+    // }
 }

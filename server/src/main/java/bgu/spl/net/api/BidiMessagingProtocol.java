@@ -8,8 +8,9 @@ public interface BidiMessagingProtocol<T>  {
 	**/
     void start(int connectionId, Connections<T> connections);
     
-    void process(T message);
-	
+
+    void process(T msg);
+
 	/**
      * @return true if the connection should be terminated
      */
