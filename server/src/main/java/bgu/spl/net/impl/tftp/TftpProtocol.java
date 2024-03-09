@@ -6,13 +6,11 @@ import bgu.spl.net.srv.Connections;
 public class TftpProtocol implements BidiMessagingProtocol<byte[]>  {
 
     private boolean shouldTerminate;
-    private Connections<byte[]> connections;
     private int connectionId;
 
     @Override
     public void start(int connectionId, Connections<byte[]> connections) {
         shouldTerminate = false;
-        this.connections = connections;
         this.connectionId = connectionId;
     }
 
@@ -20,7 +18,7 @@ public class TftpProtocol implements BidiMessagingProtocol<byte[]>  {
     public void process(byte[] message) {
         shouldTerminate = message.equals("SOMETHING_TO_CHECK".getBytes());
         // Integer[] ids = connections.getConnectionIds();
-        connections.send(connectionId, message); // returns false
+        // connections.send(connectionId, message); // returns false
     }
 
     @Override

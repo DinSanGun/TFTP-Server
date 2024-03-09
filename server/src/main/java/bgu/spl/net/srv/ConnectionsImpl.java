@@ -5,6 +5,7 @@ import java.util.concurrent.ConcurrentHashMap;
 public class ConnectionsImpl<T> implements Connections<T> {
 
     private ConcurrentHashMap<Integer, ConnectionHandler<T>> activeClients = new ConcurrentHashMap<>();
+    private int connectionIdGenerator = 1;
 
     @Override
     public void connect(int connectionId, ConnectionHandler<T> handler){
@@ -25,6 +26,11 @@ public class ConnectionsImpl<T> implements Connections<T> {
     @Override
     public void disconnect(int connectionId){
         activeClients.remove(connectionId);
+    }
+
+    @Override
+    public int getNewConnectionId(){
+        return ++connectionIdGenerator;
     }
 
     // /**

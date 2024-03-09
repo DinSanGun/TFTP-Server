@@ -16,7 +16,7 @@ public class TftpServer {
             Supplier< BidiMessagingProtocol <byte[]> > protocolFactory = () -> new TftpProtocol();
             Supplier< MessageEncoderDecoder <byte[]> > encdecFactory = TftpEncoderDecoder::new;
             Connections<byte[]> connections = new ConnectionsImpl<byte[]>();
-            
+
         // you can use any server... 
         Server.<byte[]>threadPerClient(
                 7777, //port

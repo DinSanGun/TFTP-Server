@@ -10,5 +10,7 @@ public interface Connections<T> {
 
     void disconnect(int connectionId);
 
+    int getNewConnectionId();
+
     // Integer[] getConnectionIds();
 }
