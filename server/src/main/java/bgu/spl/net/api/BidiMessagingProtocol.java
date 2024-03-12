@@ -8,7 +8,6 @@ public interface BidiMessagingProtocol<T>  {
 	**/
     void start(int connectionId, Connections<T> connections);
     
-
     void process(T msg);
 
 	/**

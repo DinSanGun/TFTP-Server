@@ -10,7 +10,6 @@ import bgu.spl.net.srv.Server;
 
 public class TftpServer {
     
-
         public static void main(String[] args) {
             
             Supplier< BidiMessagingProtocol <byte[]> > protocolFactory = () -> new TftpProtocol();
