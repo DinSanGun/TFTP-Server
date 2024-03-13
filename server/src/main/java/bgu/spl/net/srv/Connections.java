@@ -12,5 +12,12 @@ public interface Connections<T> {
 
     int getNewConnectionId();
 
+    boolean login(int connectionId , String username);
+
+    boolean isLoggedIn(int connectionId);
+
+    void sendAll(T msg);
+
+
     // Integer[] getConnectionIds();
 }
