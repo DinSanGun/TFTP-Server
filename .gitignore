@@ -5,6 +5,7 @@
 
 .devcontainer/
 .vscode/
+
 client/target/
 server/target/
 .DS_Store
@@ -15,6 +16,8 @@ server/target/
 .idea/**/usage.statistics.xml
 .idea/**/dictionaries
 .idea/**/shelf
+TFTP-rust-client-master/
+
 
 # Generated files
 .idea/**/contentModel.xml

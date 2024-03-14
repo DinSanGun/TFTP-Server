@@ -9,19 +9,25 @@ public class ConnectionsImpl<T> implements Connections<T> {
     private int connectionIdGenerator = 1;
 
     @Override
-    public void connect(int connectionId, ConnectionHandler<T> handler){
-        activeClients.put( connectionId , handler );
+    public boolean connect(int connectionId, ConnectionHandler<T> handler){
+        return activeClients.put( connectionId , handler ) == null;
     }
 
     @Override
     public boolean send(int connectionId, T msg){ //USE ConnectionHandler.send method
         
-        ConnectionHandler<T> handler = activeClients.get(connectionId);
-        if(handler == null)
-            return false;
+        if(activeClients.containsKey(connectionId)) {
+            ConnectionHandler<T> handler = activeClients.get(connectionId);
+            System.out.println("Got the handler");
+            if(handler == null)
+                return false;
+            
+            handler.send(msg);
+            return true;
+        }
 
-        handler.send(msg);
-        return true;
+        return false;
+
     }
 
     @Override

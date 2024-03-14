@@ -14,7 +14,7 @@ public class BlockingConnectionHandler<T> implements Runnable, ConnectionHandler
     private final Socket sock;
     private BufferedInputStream in;
     private BufferedOutputStream out;
-    private volatile boolean connected; //For what?
+    protected volatile boolean connected; //For what?
     private final Connections<T> connections;
 
     public BlockingConnectionHandler(Socket sock, MessageEncoderDecoder<T> reader, BidiMessagingProtocol<T> protocol, Connections<T> connections) {
@@ -27,6 +27,7 @@ public class BlockingConnectionHandler<T> implements Runnable, ConnectionHandler
 
     @Override
     public void run() {
+
         try (Socket sock = this.sock) { //just for automatic closing
             int read;
 
@@ -34,10 +35,12 @@ public class BlockingConnectionHandler<T> implements Runnable, ConnectionHandler
             out = new BufferedOutputStream(sock.getOutputStream());
 
             int connectionId = connections.getNewConnectionId();
+
             protocol.start( connectionId , connections);
-            connections.connect(connectionId, this);
+            connected = connections.connect(connectionId, this);
 
             while (!protocol.shouldTerminate() && connected && (read = in.read()) >= 0) {
+
                 T nextMessage = encdec.decodeNextByte((byte) read);
                 if (nextMessage != null) 
                     protocol.process(nextMessage);
@@ -47,6 +50,7 @@ public class BlockingConnectionHandler<T> implements Runnable, ConnectionHandler
             ex.printStackTrace();
         } 
 
+        connected = false;
 
         try {
             close();
@@ -63,11 +67,18 @@ public class BlockingConnectionHandler<T> implements Runnable, ConnectionHandler
     }
 
     @Override
-    public void send(T msg) { 
+    public void send(T msg) {
         if (msg != null) {
             try{
-                out.write(encdec.encode(msg));
+                byte[] message = encdec.encode(msg);
+                // System.out.print("[ "); TESTING
+                // for(int i = 0; i < message.length; i++)
+                //     System.out.print(message[i] + " ");
+                // System.out.print("]");
+
+                out.write(message);
                 out.flush(); 
+                System.out.println("Sent");
             } catch(IOException ex){
                 ex.printStackTrace();
             }

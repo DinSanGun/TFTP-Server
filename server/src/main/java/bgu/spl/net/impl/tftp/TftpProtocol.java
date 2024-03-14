@@ -201,7 +201,7 @@ public class TftpProtocol implements BidiMessagingProtocol<byte[]>  {
         while(!filenames.isEmpty()) {
 
             nextFilename = filenames.remove(0);
-            nextFilenameInBytes = nextFilename.getBytes();
+            nextFilenameInBytes = nextFilename.getBytes(StandardCharsets.UTF_8);
 
             for(int i = 0; i < nextFilenameInBytes.length; i++)
                 directoryListingData.add(nextFilenameInBytes[i]);
@@ -244,8 +244,11 @@ public class TftpProtocol implements BidiMessagingProtocol<byte[]>  {
         System.arraycopy(message,2,usernameInBytes,0,usernameLength); //Skips the opcode bytes
 
         String username = new String(usernameInBytes, StandardCharsets.UTF_8);
+        System.out.println(username + " is trying to connect");
 
         if( connections.login(connectionId , username) ) { //Login succeeded
+            System.out.println(username + " is connected");
+            byte[] ack = createACKPacket((short) 0);
             connections.send(connectionId, createACKPacket((short) 0));
         }
         else { //Create and send error packet
@@ -292,7 +295,7 @@ public class TftpProtocol implements BidiMessagingProtocol<byte[]>  {
     private void disconnectUser() {
         if(connections.isLoggedIn(connectionId)) {
             connections.send(connectionId, createACKPacket((short) 0));
-            shouldTerminate = true; //NOT 100% valid here - check later
+            shouldTerminate = true;
             connections.disconnect(connectionId);
         }
         else {                                                 //User has not logged in yet
@@ -349,7 +352,12 @@ public class TftpProtocol implements BidiMessagingProtocol<byte[]>  {
 
     private byte[] createACKPacket(short blockNumber) {
         byte[] blockNumberAsBytes = new byte[] { (byte) (blockNumber >> 8) , (byte) (blockNumber & 0xff) };
-        byte[] ACKPacket = {0 , 3 , blockNumberAsBytes[0] , blockNumberAsBytes[1] };
+        byte[] ACKPacket = new byte[4];
+        ACKPacket[0] = (byte) 0;
+        ACKPacket[1] = (byte) 3;
+        ACKPacket[2] = blockNumberAsBytes[0];
+        ACKPacket[3] = blockNumberAsBytes[1];
+
         return ACKPacket;
     }
 
