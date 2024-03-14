@@ -26,6 +26,9 @@ public class TftpProtocol implements BidiMessagingProtocol<byte[]>  {
     private FileInputStream fileToDownloadFromServer;
     private FileOutputStream fileToUploadToServer;
     private short waitingForAckBlockNumber; //The ACK block number that the server is expecting.
+    private List<Byte> directoryListingData;
+    private boolean clientIsDownloading;
+
 
     // private final byte[] genericAckPacket = {0 , 4 , 0 , 0};
 
@@ -35,6 +38,8 @@ public class TftpProtocol implements BidiMessagingProtocol<byte[]>  {
         this.connectionId = connectionId;
         this.connections = connections;
         waitingForAckBlockNumber = -1;
+        directoryListingData = new LinkedList<Byte>();
+        clientIsDownloading = false;
     }
 
     @Override
@@ -46,7 +51,7 @@ public class TftpProtocol implements BidiMessagingProtocol<byte[]>  {
         switch (op_code) {
             case 1: clientDownloadRequest(message); break;
             case 2: clientUploadRequest(message); break;
-            case 3: handleDataPacket(message);
+            case 3: writeNextDataPacketIntoFile(message);
             case 4: ACKPacketHandling(message); break;
             case 5: break;
             case 6: directoryList(); break; //STILL NEED TO ADD ACKNOWLDEGMENT BETWEEN PACKETS
@@ -58,50 +63,6 @@ public class TftpProtocol implements BidiMessagingProtocol<byte[]>  {
         } 
     }
 
-
-    @Override
-    public boolean shouldTerminate() {
-        return shouldTerminate;
-    } 
-
-    private void loginUser(byte[] message){
-
-        int usernameLength = message.length - 3;
-        byte[] usernameInBytes = new byte[usernameLength];
-
-        for(int i = 0; i < usernameInBytes.length; i++)
-            usernameInBytes[i] = message[i + 2]; //Skip the opcode bytes
-
-        String username = new String(usernameInBytes, StandardCharsets.UTF_8);
-
-        if( connections.login(connectionId , username) ) { //Login succeeded
-            connections.send(connectionId, createACKPacket((short) 0));
-        }
-        else { //Create and send error packet
-            byte[] errorPacket = errorPacket(7); //User already logged in
-            connections.send(connectionId, errorPacket);
-        }
-    }
-
-    private void clientUploadRequest(byte[] message){
-        
-        byte[] filenameInBytes = Arrays.copyOfRange(message, 2, message.length - 1);
-        String filename = new String(filenameInBytes , StandardCharsets.UTF_8);
-
-        File fileToCreate = new File("server\\Files" + filename);
-
-        if(fileToCreate.exists()) 
-            connections.send(connectionId, errorPacket(5));
-        else {
-            try {
-                fileToCreate.createNewFile();
-                fileToUploadToServer = new FileOutputStream(fileToCreate);
-            } catch(IOException e) { 
-                e.printStackTrace(); 
-            } 
-            connections.send(connectionId, createACKPacket((short) 0));
-        }
-    }
 
     /**
      * Checks if the file 'message' exists - if it does breaks the file into DATA packets
@@ -123,48 +84,32 @@ public class TftpProtocol implements BidiMessagingProtocol<byte[]>  {
         }
         
         waitingForAckBlockNumber = 0;
-        sendNextPacket();
+        clientIsDownloading = true;
+        sendNextFilePacket();
     }
 
-    public void sendNextPacket() {
 
-        waitingForAckBlockNumber++;
-
-        byte[] dataPacket = createEmptyDataPacket(waitingForAckBlockNumber, DATA_PACKET_MAX_SIZE);
-        int numOfBytesRead = -1;
-        try {
-            numOfBytesRead = fileToDownloadFromServer.read(dataPacket, DATA_SECTION_BEGIN_INDEX, DATA_PACKET_MAX_SIZE);
-        } catch(IOException e) {
-            e.printStackTrace();
-        }
-
-        if( numOfBytesRead == DATA_PACKET_MAX_SIZE ) 
-            connections.send(connectionId, dataPacket);
+    private void clientUploadRequest(byte[] message){
         
-        else if(numOfBytesRead > 0) {
-            byte[] lastDataPacket = createEmptyDataPacket(waitingForAckBlockNumber, numOfBytesRead);
-            System.arraycopy(dataPacket, DATA_SECTION_BEGIN_INDEX, lastDataPacket, DATA_SECTION_BEGIN_INDEX , numOfBytesRead);
-            connections.send(connectionId, lastDataPacket);
-        }
+        byte[] filenameInBytes = Arrays.copyOfRange(message, 2, message.length - 1);
+        String filename = new String(filenameInBytes , StandardCharsets.UTF_8);
+
+        File fileToCreate = new File("server\\Files" + filename);
+
+        if(fileToCreate.exists()) 
+            connections.send(connectionId, errorPacket(5));
         else {
-            waitingForAckBlockNumber = -1;
             try {
-                fileToDownloadFromServer.close();
-            } catch(IOException e) {
-                e.printStackTrace();
-            }
+                fileToCreate.createNewFile();
+                fileToUploadToServer = new FileOutputStream(fileToCreate);
+            } catch(IOException e) { 
+                e.printStackTrace(); 
+            } 
+            connections.send(connectionId, createACKPacket((short) 0));
         }
     }
 
-    public void ACKPacketHandling(byte[] packet) {
-        if(waitingForAckBlockNumber != -1) {
-            short ACKBlockNumber = (short) ( ((short) packet[2]) << 8 | (short) (packet[3]));
-            if(waitingForAckBlockNumber == ACKBlockNumber)
-                sendNextPacket();
-        }
-    }
-
-    public void handleDataPacket(byte[] packet) {
+    public void writeNextDataPacketIntoFile(byte[] packet) {
 
         int dataSectionSize = packet.length - DATA_SECTION_BEGIN_INDEX;
 
@@ -190,9 +135,121 @@ public class TftpProtocol implements BidiMessagingProtocol<byte[]>  {
                 ex.printStackTrace();
             }
         }
-
     }
+
+    public void ACKPacketHandling(byte[] packet) {
+        if(waitingForAckBlockNumber != -1) {
+            short ACKBlockNumber = (short) ( ((short) packet[2]) << 8 | (short) (packet[3]));
+            if(waitingForAckBlockNumber == ACKBlockNumber) {
+                if(clientIsDownloading)
+                    sendNextFilePacket();
+                else
+                    sendNextDirectoryListPackets();
+            }
+        }
+    }
+
+    public void sendNextFilePacket() {
+
+        waitingForAckBlockNumber++;
+
+        byte[] dataPacket = createEmptyDataPacket(waitingForAckBlockNumber, DATA_PACKET_MAX_SIZE);
+        int numOfBytesRead = -1;
+        try {
+            numOfBytesRead = fileToDownloadFromServer.read(dataPacket, DATA_SECTION_BEGIN_INDEX, DATA_PACKET_MAX_SIZE);
+        } catch(IOException e) {
+            e.printStackTrace();
+        }
+
+        if( numOfBytesRead == DATA_PACKET_MAX_SIZE ) 
+            connections.send(connectionId, dataPacket);
+        
+        else if(numOfBytesRead > 0) {
+            byte[] lastDataPacket = createEmptyDataPacket(waitingForAckBlockNumber, numOfBytesRead);
+            System.arraycopy(dataPacket, DATA_SECTION_BEGIN_INDEX, lastDataPacket, DATA_SECTION_BEGIN_INDEX , numOfBytesRead);
+            connections.send(connectionId, lastDataPacket);
+        }
+        else {
+            waitingForAckBlockNumber = -1;
+            clientIsDownloading = false;
+            // broadcast(filename, (byte) 1);
+
+            try {
+                fileToDownloadFromServer.close();
+            } catch(IOException e) {
+                e.printStackTrace();
+            }
+        }
+    }
+
+
+    /**
+     * This method handles the packets of type DIRQ - lists the files in the server
+     */
+    private void directoryList() {
+        List<String> filenames = listFilesInDirectory("server\\Files");
+        String nextFilename;
+        byte[] nextFilenameInBytes;
+        byte separator = 0;
+
+        while(!filenames.isEmpty()) {
+
+            nextFilename = filenames.remove(0);
+            nextFilenameInBytes = nextFilename.getBytes();
+
+            for(int i = 0; i < nextFilenameInBytes.length; i++)
+                directoryListingData.add(nextFilenameInBytes[i]);
+
+            directoryListingData.add(separator);
+        }
+
+        waitingForAckBlockNumber = 0;
+        sendNextDirectoryListPackets();
+    }
+
+    private void sendNextDirectoryListPackets() {
+
+        waitingForAckBlockNumber++;
+
+        if(!directoryListingData.isEmpty()) {
+
+            int dataSectionSize;
+            if(directoryListingData.size() < DATA_PACKET_MAX_SIZE)
+                dataSectionSize = directoryListingData.size();
+            else
+                dataSectionSize = DATA_PACKET_MAX_SIZE;
     
+            byte[] dataPacket = createEmptyDataPacket(waitingForAckBlockNumber, dataSectionSize);
+            for(int i = DATA_SECTION_BEGIN_INDEX; i < dataPacket.length; i++)
+                dataPacket[i] = directoryListingData.remove(0);
+            
+            connections.send(connectionId, dataPacket);
+        }
+        else
+            waitingForAckBlockNumber = -1;
+    }
+
+
+    private void loginUser(byte[] message){
+
+        int usernameLength = message.length - 3;
+        byte[] usernameInBytes = new byte[usernameLength];
+
+        for(int i = 0; i < usernameInBytes.length; i++)
+            usernameInBytes[i] = message[i + 2]; //Skip the opcode bytes
+
+        String username = new String(usernameInBytes, StandardCharsets.UTF_8);
+
+        if( connections.login(connectionId , username) ) { //Login succeeded
+            connections.send(connectionId, createACKPacket((short) 0));
+        }
+        else { //Create and send error packet
+            byte[] errorPacket = errorPacket(7); //User already logged in
+            connections.send(connectionId, errorPacket);
+        }
+    }
+
+     
     private void deleteFile(byte[] message) {
         byte[] filenameInBytes = Arrays.copyOfRange(message, 2, message.length - 1);
         String filename = new String(filenameInBytes , StandardCharsets.UTF_8);
@@ -210,69 +267,6 @@ public class TftpProtocol implements BidiMessagingProtocol<byte[]>  {
     }   
 
     /**
-     * This method handles disconnect of the current client from the server
-     */
-    private void disconnectUser() {
-        if(connections.isLoggedIn(connectionId)) {
-            connections.send(connectionId, createACKPacket((short) 0));
-            shouldTerminate = true; //NOT 100% valid here - check later
-            connections.disconnect(connectionId);
-        }
-        else {                                                 //User has not logged in yet
-            connections.send(connectionId, errorPacket(6));
-        }
-    }
-
-    /**
-     * This method handles the packets of type DIRQ - lists the files in the server
-     */
-    private void directoryList() {
-        List<String> filenames = listFilesInDirectory("server\\Files");
-        List<Byte> data = new LinkedList<Byte>();
-        String nextFilename;
-        byte[] nextFilenameInBytes;
-        byte separator = 0;
-
-        while(!filenames.isEmpty()) {
-
-            nextFilename = filenames.remove(0);
-            nextFilenameInBytes = nextFilename.getBytes();
-
-            for(int i = 0; i < nextFilenameInBytes.length; i++)
-                data.add(nextFilenameInBytes[i]);
-
-            data.add(separator);
-        }
-
-        short blockNumber = 1;
-        short nextPacketSize;
-        while(!data.isEmpty()) {
-
-            //Determining data section size in the next packet
-            if(data.size() >= 512)
-                nextPacketSize = 512;
-            else
-                nextPacketSize = (short) data.size();
-
-            //Creating new DATA packet
-            byte[] dataPacket = new byte[nextPacketSize + DATA_SECTION_BEGIN_INDEX];
-            dataPacket[0] = 0;
-            dataPacket[1] = 3; //DATA OP_CODE
-            dataPacket[2] = (byte) (nextPacketSize >> 8); //Packet size - 2 bytes
-            dataPacket[3] = (byte) (nextPacketSize & 0xff);
-            dataPacket[4] = (byte) (blockNumber >> 8); //Block number - 2 bytes
-            dataPacket[5] = (byte) (blockNumber & 0xff);
-            
-
-            for(int i = DATA_SECTION_BEGIN_INDEX; i < dataPacket.length; i++) 
-                dataPacket[i] = data.remove(0);
-            
-            connections.send(connectionId, dataPacket);
-            blockNumber++;
-        }
-    }
-
-    /**
      * This method notifies all logged in clients about file deleted/added.
      * @param filename
      * @param deleted_added - 0 indicates deleted file, 1 indicates added file
@@ -287,6 +281,24 @@ public class TftpProtocol implements BidiMessagingProtocol<byte[]>  {
         System.arraycopy(filenameAsBytes, 0, BCASTPacket, 3, filenameAsBytes.length);
         connections.sendAll(BCASTPacket);
     }
+
+    /**
+     * This method handles disconnect of the current client from the server
+     */
+    private void disconnectUser() {
+        if(connections.isLoggedIn(connectionId)) {
+            connections.send(connectionId, createACKPacket((short) 0));
+            shouldTerminate = true; //NOT 100% valid here - check later
+            connections.disconnect(connectionId);
+        }
+        else {                                                 //User has not logged in yet
+            connections.send(connectionId, errorPacket(6));
+        }
+    }
+
+
+    
+    //=================================HELPER METHODS==================================
 
     /**
      * This method creates and returns an error packet of certain error code
@@ -319,18 +331,6 @@ public class TftpProtocol implements BidiMessagingProtocol<byte[]>  {
         return errPacket;
     }
 
-    /**
-     * @param dir - the directory to lookup
-     * @return a set of all the file names in the specified directory
-     */
-    private List<String> listFilesInDirectory(String dir) {
-    return Stream.of(new File(dir).listFiles())
-      .filter(file -> !file.isDirectory())
-      .map(File::getName)
-      .collect(Collectors.toList());
-    }
-    
-
     private byte[] createEmptyDataPacket(int blockNumber, int dataSectionSize) {
 
         byte[] dataPacket = new byte[dataSectionSize + DATA_SECTION_BEGIN_INDEX];
@@ -348,4 +348,21 @@ public class TftpProtocol implements BidiMessagingProtocol<byte[]>  {
         byte[] ACKPacket = {0 , 3 , blockNumberAsBytes[0] , blockNumberAsBytes[1] };
         return ACKPacket;
     }
+
+    /**
+     * @param dir - the directory to lookup
+     * @return a set of all the file names in the specified directory
+     */
+    private List<String> listFilesInDirectory(String dir) {
+    return Stream.of(new File(dir).listFiles())
+      .filter(file -> !file.isDirectory())
+      .map(File::getName)
+      .collect(Collectors.toList());
+    }
+
+    @Override
+    public boolean shouldTerminate() {
+        return shouldTerminate;
+    } 
+
 }
