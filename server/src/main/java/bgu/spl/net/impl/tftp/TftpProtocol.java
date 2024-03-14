@@ -28,9 +28,7 @@ public class TftpProtocol implements BidiMessagingProtocol<byte[]>  {
     private short waitingForAckBlockNumber; //The ACK block number that the server is expecting.
     private List<Byte> directoryListingData;
     private boolean clientIsDownloading;
-
-
-    // private final byte[] genericAckPacket = {0 , 4 , 0 , 0};
+    private String uploadFileName;
 
     @Override
     public void start(int connectionId, Connections<byte[]> connections) {
@@ -40,6 +38,7 @@ public class TftpProtocol implements BidiMessagingProtocol<byte[]>  {
         waitingForAckBlockNumber = -1;
         directoryListingData = new LinkedList<Byte>();
         clientIsDownloading = false;
+        uploadFileName = null;
     }
 
     @Override
@@ -48,13 +47,18 @@ public class TftpProtocol implements BidiMessagingProtocol<byte[]>  {
         byte op_code = message[1]; //The op code is represented by the first 2 bytes -
                                 // first of them is zero according to the instructions
 
+        if(op_code != 7) { //User not logged in and trying to make requests to server
+            if(!connections.isLoggedIn(connectionId)) 
+                connections.send(connectionId, errorPacket(6));
+        }
+
         switch (op_code) {
             case 1: clientDownloadRequest(message); break;
             case 2: clientUploadRequest(message); break;
             case 3: writeNextDataPacketIntoFile(message);
             case 4: ACKPacketHandling(message); break;
             case 5: break;
-            case 6: directoryList(); break; //STILL NEED TO ADD ACKNOWLDEGMENT BETWEEN PACKETS
+            case 6: directoryList(); break; 
             case 7: loginUser(message); break;
             case 8: deleteFile(message); break;
             case 9: break;
@@ -105,6 +109,7 @@ public class TftpProtocol implements BidiMessagingProtocol<byte[]>  {
             } catch(IOException e) { 
                 e.printStackTrace(); 
             } 
+            uploadFileName = filename;
             connections.send(connectionId, createACKPacket((short) 0));
         }
     }
@@ -128,7 +133,9 @@ public class TftpProtocol implements BidiMessagingProtocol<byte[]>  {
         short packetBlockNumber = (short) ( ((short) packet[2]) << 8 | (short) (packet[3]));
         connections.send(connectionId, createACKPacket(packetBlockNumber));
 
-        if(dataSectionSize < DATA_PACKET_MAX_SIZE) {
+        if(dataSectionSize < DATA_PACKET_MAX_SIZE) { //It means this is the last data packet
+            broadcast(uploadFileName, (byte) 1);
+            uploadFileName = null;
             try {
                 fileToUploadToServer.close();
             } catch(IOException ex) {
@@ -172,7 +179,6 @@ public class TftpProtocol implements BidiMessagingProtocol<byte[]>  {
         else {
             waitingForAckBlockNumber = -1;
             clientIsDownloading = false;
-            // broadcast(filename, (byte) 1);
 
             try {
                 fileToDownloadFromServer.close();
@@ -235,8 +241,7 @@ public class TftpProtocol implements BidiMessagingProtocol<byte[]>  {
         int usernameLength = message.length - 3;
         byte[] usernameInBytes = new byte[usernameLength];
 
-        for(int i = 0; i < usernameInBytes.length; i++)
-            usernameInBytes[i] = message[i + 2]; //Skip the opcode bytes
+        System.arraycopy(message,2,usernameInBytes,0,usernameLength); //Skips the opcode bytes
 
         String username = new String(usernameInBytes, StandardCharsets.UTF_8);
 
@@ -244,8 +249,7 @@ public class TftpProtocol implements BidiMessagingProtocol<byte[]>  {
             connections.send(connectionId, createACKPacket((short) 0));
         }
         else { //Create and send error packet
-            byte[] errorPacket = errorPacket(7); //User already logged in
-            connections.send(connectionId, errorPacket);
+            connections.send(connectionId, errorPacket(7)); //User already logged in
         }
     }
 

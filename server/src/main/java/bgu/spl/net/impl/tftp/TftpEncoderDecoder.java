@@ -71,6 +71,6 @@ public class TftpEncoderDecoder implements MessageEncoderDecoder<byte[]> {
 
     @Override
     public byte[] encode(byte[] message) { 
-        return message; //No conversion or modification needed
+        return message; //No conversion needed
     }
 }

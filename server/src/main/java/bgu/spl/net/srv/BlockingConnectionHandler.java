@@ -14,9 +14,8 @@ public class BlockingConnectionHandler<T> implements Runnable, ConnectionHandler
     private final Socket sock;
     private BufferedInputStream in;
     private BufferedOutputStream out;
-    private volatile boolean connected;
+    private volatile boolean connected; //For what?
     private final Connections<T> connections;
-    private String username;
 
     public BlockingConnectionHandler(Socket sock, MessageEncoderDecoder<T> reader, BidiMessagingProtocol<T> protocol, Connections<T> connections) {
         this.sock = sock;
@@ -24,7 +23,6 @@ public class BlockingConnectionHandler<T> implements Runnable, ConnectionHandler
         this.protocol = protocol;
         this.connections = connections;
         connected = false;
-        username = null;
     }
 
     @Override
@@ -47,6 +45,13 @@ public class BlockingConnectionHandler<T> implements Runnable, ConnectionHandler
 
         } catch (IOException ex) {
             ex.printStackTrace();
+        } 
+
+
+        try {
+            close();
+        } catch(IOException ex) {
+            ex.printStackTrace();
         }
 
     }
@@ -58,8 +63,7 @@ public class BlockingConnectionHandler<T> implements Runnable, ConnectionHandler
     }
 
     @Override
-    public void send(T msg) { //THIS FUNCTION NEEDS TO BE MODIFIED OR CHECKED LATER ON
-        //IMPLEMENT IF NEEDED
+    public void send(T msg) { 
         if (msg != null) {
             try{
                 out.write(encdec.encode(msg));
@@ -68,13 +72,5 @@ public class BlockingConnectionHandler<T> implements Runnable, ConnectionHandler
                 ex.printStackTrace();
             }
         }
-    }
-
-    protected String getUsername(){
-        return username;
-    }
-
-    protected void setUsername(String username){
-        this.username = username;
     }
 }
