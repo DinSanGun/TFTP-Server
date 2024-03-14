@@ -1,17 +1,14 @@
 package bgu.spl.net.impl.tftp;
 
-import java.io.BufferedInputStream;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileNotFoundException;
-import java.io.FilenameFilter;
+import java.io.FileOutputStream;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
-import java.nio.file.Files;
 import java.util.Arrays;
 import java.util.LinkedList;
 import java.util.List;
-import java.util.Set;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
@@ -20,17 +17,24 @@ import bgu.spl.net.srv.Connections;
 
 public class TftpProtocol implements BidiMessagingProtocol<byte[]>  {
 
+    private static final int DATA_PACKET_MAX_SIZE = 512;
+    private static final int DATA_SECTION_BEGIN_INDEX = 6;
+
     private boolean shouldTerminate;
     private int connectionId;
     private Connections<byte[]> connections;
+    private FileInputStream fileToDownloadFromServer;
+    private FileOutputStream fileToUploadToServer;
+    private short waitingForAckBlockNumber; //The ACK block number that the server is expecting.
 
-    private final byte[] genericAckPacket = {0 , 4 , 0 , 0};
+    // private final byte[] genericAckPacket = {0 , 4 , 0 , 0};
 
     @Override
     public void start(int connectionId, Connections<byte[]> connections) {
         shouldTerminate = false;
         this.connectionId = connectionId;
         this.connections = connections;
+        waitingForAckBlockNumber = -1;
     }
 
     @Override
@@ -42,8 +46,8 @@ public class TftpProtocol implements BidiMessagingProtocol<byte[]>  {
         switch (op_code) {
             case 1: clientDownloadRequest(message); break;
             case 2: clientUploadRequest(message); break;
-            case 3: break;
-            case 4: break;
+            case 3: handleDataPacket(message);
+            case 4: ACKPacketHandling(message); break;
             case 5: break;
             case 6: directoryList(); break; //STILL NEED TO ADD ACKNOWLDEGMENT BETWEEN PACKETS
             case 7: loginUser(message); break;
@@ -71,7 +75,7 @@ public class TftpProtocol implements BidiMessagingProtocol<byte[]>  {
         String username = new String(usernameInBytes, StandardCharsets.UTF_8);
 
         if( connections.login(connectionId , username) ) { //Login succeeded
-            connections.send(connectionId, genericAckPacket);
+            connections.send(connectionId, createACKPacket((short) 0));
         }
         else { //Create and send error packet
             byte[] errorPacket = errorPacket(7); //User already logged in
@@ -81,51 +85,112 @@ public class TftpProtocol implements BidiMessagingProtocol<byte[]>  {
 
     private void clientUploadRequest(byte[] message){
         
+        byte[] filenameInBytes = Arrays.copyOfRange(message, 2, message.length - 1);
+        String filename = new String(filenameInBytes , StandardCharsets.UTF_8);
+
+        File fileToCreate = new File("server\\Files" + filename);
+
+        if(fileToCreate.exists()) 
+            connections.send(connectionId, errorPacket(5));
+        else {
+            try {
+                fileToCreate.createNewFile();
+                fileToUploadToServer = new FileOutputStream(fileToCreate);
+            } catch(IOException e) { 
+                e.printStackTrace(); 
+            } 
+            connections.send(connectionId, createACKPacket((short) 0));
+        }
     }
 
+    /**
+     * Checks if the file 'message' exists - if it does breaks the file into DATA packets
+     * and add them to the dataPacketsForClient. Upon receiving of ACK packet from client
+     * the next DATA packet is sent.
+     * @param message
+     */
     private void clientDownloadRequest(byte[] message) {
 
         byte[] filenameInBytes = Arrays.copyOfRange(message, 2, message.length - 1);
         String filename = new String(filenameInBytes , StandardCharsets.UTF_8);
-        FileInputStream fileAsStream;        
 
         try{
-            fileAsStream = new FileInputStream("server\\Files" + filename);
-            
-            int dataPacketSize = 512 + 6;
-            int blockNumber = 1;
-            //Creating new DATA packet
-            byte[] dataPacket = createDataPacket(blockNumber , dataPacketSize);
-
-            byte nextByte;
-            int index = 6;
-            while( (nextByte = (byte) fileAsStream.read()) >= 0) {
-
-                dataPacket[index] = nextByte;
-                index++;
-
-                if(index == dataPacket.length - 1) {
-                    dataPacket[index] = 0;
-                    connections.send(connectionId, dataPacket);
-                    blockNumber++;
-                    dataPacket = createDataPacket(blockNumber, dataPacketSize);
-                    index = 0;
-                }
-            }
-
-            if(index != 0) {
-                int lastDataPacketSize = index + 2; //+2 because 1 extra byte for termination byte zero, and another one because index starts with zero, hence size is + 2.
-                byte[] lastDataPacket = createDataPacket(blockNumber, lastDataPacketSize); 
-                System.arraycopy(dataPacket, 0, lastDataPacket, 0, index + 1);
-                lastDataPacket[lastDataPacketSize - 1] = 0;
-                connections.send(connectionId, lastDataPacket);
-            }
-
-        } catch(FileNotFoundException e) {
-            connections.send(connectionId, errorPacket(1));
-        } catch(IOException ex) {
-            ex.printStackTrace();
+            fileToDownloadFromServer = new FileInputStream("server\\Files" + filename);
         }
+        catch(FileNotFoundException e){
+            connections.send(connectionId, errorPacket(1));
+            return;
+        }
+        
+        waitingForAckBlockNumber = 0;
+        sendNextPacket();
+    }
+
+    public void sendNextPacket() {
+
+        waitingForAckBlockNumber++;
+
+        byte[] dataPacket = createEmptyDataPacket(waitingForAckBlockNumber, DATA_PACKET_MAX_SIZE);
+        int numOfBytesRead = -1;
+        try {
+            numOfBytesRead = fileToDownloadFromServer.read(dataPacket, DATA_SECTION_BEGIN_INDEX, DATA_PACKET_MAX_SIZE);
+        } catch(IOException e) {
+            e.printStackTrace();
+        }
+
+        if( numOfBytesRead == DATA_PACKET_MAX_SIZE ) 
+            connections.send(connectionId, dataPacket);
+        
+        else if(numOfBytesRead > 0) {
+            byte[] lastDataPacket = createEmptyDataPacket(waitingForAckBlockNumber, numOfBytesRead);
+            System.arraycopy(dataPacket, DATA_SECTION_BEGIN_INDEX, lastDataPacket, DATA_SECTION_BEGIN_INDEX , numOfBytesRead);
+            connections.send(connectionId, lastDataPacket);
+        }
+        else {
+            waitingForAckBlockNumber = -1;
+            try {
+                fileToDownloadFromServer.close();
+            } catch(IOException e) {
+                e.printStackTrace();
+            }
+        }
+    }
+
+    public void ACKPacketHandling(byte[] packet) {
+        if(waitingForAckBlockNumber != -1) {
+            short ACKBlockNumber = (short) ( ((short) packet[2]) << 8 | (short) (packet[3]));
+            if(waitingForAckBlockNumber == ACKBlockNumber)
+                sendNextPacket();
+        }
+    }
+
+    public void handleDataPacket(byte[] packet) {
+
+        int dataSectionSize = packet.length - DATA_SECTION_BEGIN_INDEX;
+
+        byte[] dataToWriteToFile = new byte[dataSectionSize];
+
+        System.arraycopy(packet, DATA_SECTION_BEGIN_INDEX, dataToWriteToFile, 0 , dataSectionSize);
+
+        try {
+            fileToUploadToServer.write(dataToWriteToFile);
+            fileToUploadToServer.flush();
+        } catch(IOException e) {
+            e.printStackTrace();
+            return;
+        }
+
+        short packetBlockNumber = (short) ( ((short) packet[2]) << 8 | (short) (packet[3]));
+        connections.send(connectionId, createACKPacket(packetBlockNumber));
+
+        if(dataSectionSize < DATA_PACKET_MAX_SIZE) {
+            try {
+                fileToUploadToServer.close();
+            } catch(IOException ex) {
+                ex.printStackTrace();
+            }
+        }
+
     }
     
     private void deleteFile(byte[] message) {
@@ -137,7 +202,7 @@ public class TftpProtocol implements BidiMessagingProtocol<byte[]>  {
         if(!fileToDelete.exists())
             connections.send(connectionId, errorPacket(1));
         else {
-            connections.send(connectionId, genericAckPacket);
+            connections.send(connectionId, createACKPacket((short) 0));
             fileToDelete.delete();
             byte deleted = 0;
             broadcast(filename, deleted);
@@ -149,7 +214,7 @@ public class TftpProtocol implements BidiMessagingProtocol<byte[]>  {
      */
     private void disconnectUser() {
         if(connections.isLoggedIn(connectionId)) {
-            connections.send(connectionId, genericAckPacket);
+            connections.send(connectionId, createACKPacket((short) 0));
             shouldTerminate = true; //NOT 100% valid here - check later
             connections.disconnect(connectionId);
         }
@@ -190,7 +255,7 @@ public class TftpProtocol implements BidiMessagingProtocol<byte[]>  {
                 nextPacketSize = (short) data.size();
 
             //Creating new DATA packet
-            byte[] dataPacket = new byte[nextPacketSize + 6];
+            byte[] dataPacket = new byte[nextPacketSize + DATA_SECTION_BEGIN_INDEX];
             dataPacket[0] = 0;
             dataPacket[1] = 3; //DATA OP_CODE
             dataPacket[2] = (byte) (nextPacketSize >> 8); //Packet size - 2 bytes
@@ -199,7 +264,7 @@ public class TftpProtocol implements BidiMessagingProtocol<byte[]>  {
             dataPacket[5] = (byte) (blockNumber & 0xff);
             
 
-            for(int i = 6; i < dataPacket.length; i++) //Data section starts at index 6
+            for(int i = DATA_SECTION_BEGIN_INDEX; i < dataPacket.length; i++) 
                 dataPacket[i] = data.remove(0);
             
             connections.send(connectionId, dataPacket);
@@ -246,7 +311,7 @@ public class TftpProtocol implements BidiMessagingProtocol<byte[]>  {
         }
 
         byte[] errMessageInBytes = errMessage.getBytes();
-        byte[] errPacketBeginning = {0 , 5 , 0 , errCode};
+        byte[] errPacketBeginning = { 0 , 5 , 0 , errCode};
         byte[] errPacket = new byte[errMessageInBytes.length + errPacketBeginning.length + 1];
         System.arraycopy(errPacketBeginning, 0, errPacket, 0, 4);
         System.arraycopy(errMessageInBytes, 0, errPacket, 4, errMessageInBytes.length);
@@ -266,15 +331,21 @@ public class TftpProtocol implements BidiMessagingProtocol<byte[]>  {
     }
     
 
-    private byte[] createDataPacket(int blockNumber, int packetSize) {
+    private byte[] createEmptyDataPacket(int blockNumber, int dataSectionSize) {
 
-        byte[] dataPacket = new byte[packetSize];
+        byte[] dataPacket = new byte[dataSectionSize + DATA_SECTION_BEGIN_INDEX];
         dataPacket[0] = 0;
         dataPacket[1] = 3; //DATA OP_CODE
-        dataPacket[2] = (byte) (packetSize >> 8); //Packet size - 2 bytes
-        dataPacket[3] = (byte) (packetSize & 0xff);
+        dataPacket[2] = (byte) (dataSectionSize >> 8); //Packet size - 2 bytes
+        dataPacket[3] = (byte) (dataSectionSize & 0xff);
         dataPacket[4] = (byte) (blockNumber >> 8); //Block number - 2 bytes
         dataPacket[5] = (byte) (blockNumber & 0xff);
         return dataPacket;
+    }
+
+    private byte[] createACKPacket(short blockNumber) {
+        byte[] blockNumberAsBytes = new byte[] { (byte) (blockNumber >> 8) , (byte) (blockNumber & 0xff) };
+        byte[] ACKPacket = {0 , 3 , blockNumberAsBytes[0] , blockNumberAsBytes[1] };
+        return ACKPacket;
     }
 }
