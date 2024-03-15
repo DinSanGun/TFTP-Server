@@ -136,7 +136,7 @@ public class TftpProtocol implements BidiMessagingProtocol<byte[]>  {
             return;
         }
 
-        short packetBlockNumber = (short) ( ((short) packet[4]) << 8 | (short) (packet[5]));
+        short packetBlockNumber = (short) ( ((short) packet[4]) << 8 | (short) (packet[5]) & 0xff);
         System.out.println("Block number " + packetBlockNumber + " received");
         connections.send(connectionId, createACKPacket(packetBlockNumber));
 
@@ -153,7 +153,7 @@ public class TftpProtocol implements BidiMessagingProtocol<byte[]>  {
 
     public void ACKPacketHandling(byte[] packet) {
         if(waitingForAckBlockNumber != -1) {
-            short ACKBlockNumber = (short) ( ((short) packet[2]) << 8 | (short) (packet[3]));
+            short ACKBlockNumber = (short) ( ((short) packet[2]) << 8 | (short) (packet[3]) & 0xff);
             if(waitingForAckBlockNumber == ACKBlockNumber) {
                 if(clientIsDownloading)
                     sendNextFilePacket();

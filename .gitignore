@@ -9,6 +9,8 @@
 client/target/
 server/target/
 .DS_Store
+TftpClient.exe
+TFTP-rust-client-master/
 
 # User-specific stuff
 .idea/**/workspace.xml
