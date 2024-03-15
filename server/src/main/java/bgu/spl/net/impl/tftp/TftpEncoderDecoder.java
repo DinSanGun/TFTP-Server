@@ -24,14 +24,14 @@ public class TftpEncoderDecoder implements MessageEncoderDecoder<byte[]> {
             op_code = nextByte;
         
             switch (op_code) {
-                case (byte) 1: break;
-                case (byte) 2: break;
+                case (byte) 1: messageEndsWithZero = true; break;
+                case (byte) 2: messageEndsWithZero = true; break;
                 case (byte) 3: messageEndsWithZero = false; break;
                 case (byte) 4: messageEndsWithZero = false; break;
                 case (byte) 5: break;
                 case (byte) 6: messageEnded = true; break; //2 byte packet
                 case (byte) 7: break;
-                case (byte) 8: break;
+                case (byte) 8: messageEndsWithZero = true; break;
                 case (byte) 9: break;
                 case (byte) 10: messageEnded = true; break; //2 byte packet
                 default: break; //ERROR?

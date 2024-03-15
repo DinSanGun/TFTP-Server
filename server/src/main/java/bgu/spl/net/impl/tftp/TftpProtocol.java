@@ -42,6 +42,7 @@ public class TftpProtocol implements BidiMessagingProtocol<byte[]>  {
     @Override
     public void process(byte[] message) {
 
+        System.out.println("TFTP Protocol got");
         System.out.print("[ ");
         for(int i = 0; i < message.length; i++)
             System.out.print(message[i] + " ");
@@ -85,7 +86,7 @@ public class TftpProtocol implements BidiMessagingProtocol<byte[]>  {
         String filename = new String(filenameInBytes , StandardCharsets.UTF_8);
 
         try{
-            fileToDownloadFromServer = new FileInputStream("server\\Files" + filename);
+            fileToDownloadFromServer = new FileInputStream("Files/" + filename);
         }
         catch(FileNotFoundException e){
             connections.send(connectionId, errorPacket(1));
@@ -103,7 +104,7 @@ public class TftpProtocol implements BidiMessagingProtocol<byte[]>  {
         byte[] filenameInBytes = Arrays.copyOfRange(message, 2, message.length - 1);
         String filename = new String(filenameInBytes , StandardCharsets.UTF_8);
 
-        File fileToCreate = new File("server\\Files" + filename);
+        File fileToCreate = new File("Files/" + filename);
 
         if(fileToCreate.exists()) 
             connections.send(connectionId, errorPacket(5));
@@ -135,7 +136,8 @@ public class TftpProtocol implements BidiMessagingProtocol<byte[]>  {
             return;
         }
 
-        short packetBlockNumber = (short) ( ((short) packet[2]) << 8 | (short) (packet[3]));
+        short packetBlockNumber = (short) ( ((short) packet[4]) << 8 | (short) (packet[5]));
+        System.out.println("Block number " + packetBlockNumber + " received");
         connections.send(connectionId, createACKPacket(packetBlockNumber));
 
         if(dataSectionSize < DATA_PACKET_MAX_SIZE) { //It means this is the last data packet
@@ -266,7 +268,7 @@ public class TftpProtocol implements BidiMessagingProtocol<byte[]>  {
         byte[] filenameInBytes = Arrays.copyOfRange(message, 2, message.length - 1);
         String filename = new String(filenameInBytes , StandardCharsets.UTF_8);
 
-        File fileToDelete = new File("server\\Files" + filename);
+        File fileToDelete = new File("Files/" + filename);
 
         if(!fileToDelete.exists())
             connections.send(connectionId, errorPacket(1));
