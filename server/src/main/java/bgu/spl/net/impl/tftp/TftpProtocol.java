@@ -9,8 +9,6 @@ import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
 import java.util.LinkedList;
 import java.util.List;
-import java.util.stream.Collectors;
-import java.util.stream.Stream;
 
 import bgu.spl.net.api.BidiMessagingProtocol;
 import bgu.spl.net.srv.Connections;
@@ -44,27 +42,34 @@ public class TftpProtocol implements BidiMessagingProtocol<byte[]>  {
     @Override
     public void process(byte[] message) {
 
+        System.out.print("[ ");
+        for(int i = 0; i < message.length; i++)
+            System.out.print(message[i] + " ");
+        System.out.print("]");
+        System.out.println();
+
         byte op_code = message[1]; //The op code is represented by the first 2 bytes -
                                 // first of them is zero according to the instructions
 
-        if(op_code != 7) { //User not logged in and trying to make requests to server
-            if(!connections.isLoggedIn(connectionId)) 
+        if(op_code != 7 && !connections.isLoggedIn(connectionId))  //User not logged in and trying to make requests to server
                 connections.send(connectionId, errorPacket(6));
-        }
 
-        switch (op_code) {
-            case 1: clientDownloadRequest(message); break;
-            case 2: clientUploadRequest(message); break;
-            case 3: writeNextDataPacketIntoFile(message);
-            case 4: ACKPacketHandling(message); break;
-            case 5: break;
-            case 6: directoryList(); break; 
-            case 7: loginUser(message); break;
-            case 8: deleteFile(message); break;
-            case 9: break;
-            case 10: disconnectUser(); break;
-            default: connections.send(connectionId, errorPacket(4)); break;
-        } 
+        else {
+
+            switch (op_code) {
+                case 1: clientDownloadRequest(message); break;
+                case 2: clientUploadRequest(message); break;
+                case 3: writeNextDataPacketIntoFile(message);
+                case 4: ACKPacketHandling(message); break;
+                case 5: break;
+                case 6: directoryList(); break; 
+                case 7: loginUser(message); break;
+                case 8: deleteFile(message); break;
+                case 9: break;
+                case 10: disconnectUser(); break;
+                default: connections.send(connectionId, errorPacket(4)); break;
+            } 
+        }
     }
 
 
@@ -193,7 +198,7 @@ public class TftpProtocol implements BidiMessagingProtocol<byte[]>  {
      * This method handles the packets of type DIRQ - lists the files in the server
      */
     private void directoryList() {
-        List<String> filenames = listFilesInDirectory("server\\Files");
+        List<String> filenames = listFilesInDirectory("Files");
         String nextFilename;
         byte[] nextFilenameInBytes;
         byte separator = 0;
@@ -354,7 +359,7 @@ public class TftpProtocol implements BidiMessagingProtocol<byte[]>  {
         byte[] blockNumberAsBytes = new byte[] { (byte) (blockNumber >> 8) , (byte) (blockNumber & 0xff) };
         byte[] ACKPacket = new byte[4];
         ACKPacket[0] = (byte) 0;
-        ACKPacket[1] = (byte) 3;
+        ACKPacket[1] = (byte) 4;
         ACKPacket[2] = blockNumberAsBytes[0];
         ACKPacket[3] = blockNumberAsBytes[1];
 
@@ -366,11 +371,18 @@ public class TftpProtocol implements BidiMessagingProtocol<byte[]>  {
      * @return a set of all the file names in the specified directory
      */
     private List<String> listFilesInDirectory(String dir) {
-    return Stream.of(new File(dir).listFiles())
-      .filter(file -> !file.isDirectory())
-      .map(File::getName)
-      .collect(Collectors.toList());
+
+        File folder = new File(dir);
+        File[] listOfFiles = folder.listFiles();
+        List<String> filenames = new LinkedList<String>();
+
+        for (int i = 0; i < listOfFiles.length; i++) {
+            if (listOfFiles[i].isFile()) 
+                filenames.add( listOfFiles[i].getName() );
+        }
+        return filenames;
     }
+
 
     @Override
     public boolean shouldTerminate() {

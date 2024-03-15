@@ -18,7 +18,7 @@ public class ConnectionsImpl<T> implements Connections<T> {
         
         if(activeClients.containsKey(connectionId)) {
             ConnectionHandler<T> handler = activeClients.get(connectionId);
-            System.out.println("Got the handler");
+            
             if(handler == null)
                 return false;
             

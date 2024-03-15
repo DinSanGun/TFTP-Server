@@ -78,7 +78,6 @@ public class BlockingConnectionHandler<T> implements Runnable, ConnectionHandler
 
                 out.write(message);
                 out.flush(); 
-                System.out.println("Sent");
             } catch(IOException ex){
                 ex.printStackTrace();
             }
