@@ -30,12 +30,15 @@ public class TftpKeyboardHandler implements Runnable {
 
     @Override
     public void run() {
+        System.out.println("Started input handler");
         String command; // the command from the user
         byte[] encodedCommand;
 
         try {
             while (!protocol.shouldTerminate()) {
                 command = in.readLine();
+
+                System.out.println("Client entered: " + command);
 
                 if (command != null) {
                     encodedCommand = encodeCommand(command);
@@ -89,9 +92,11 @@ public class TftpKeyboardHandler implements Runnable {
      * @return
      */
     private byte[] encodeCommand(String command) {
+
         String[] args = command.split(" ");
-        int opcodeValue = Integer.parseInt(args[0]);
-        TftpMassagingProtocol.Opcode code = TftpMassagingProtocol.Opcode.fromInt(opcodeValue);
+        String opcodeValue = args[0];
+
+        TftpMassagingProtocol.Opcode code = TftpMassagingProtocol.Opcode.fromString(opcodeValue);
         byte[] encodedCommand = null;
         String arg = args.length > 1 ? command.substring(args[0].length() + 1) : "";
         byte[] encodedArg = arg.getBytes(StandardCharsets.UTF_8);

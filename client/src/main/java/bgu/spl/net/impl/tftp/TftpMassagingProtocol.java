@@ -55,6 +55,19 @@ public class TftpMassagingProtocol implements MessagingProtocol<byte[]> {
             return UNKNOWN;
         }
 
+        public static Opcode fromString(String value) {
+
+            switch(value) {
+                case "RRQ":     return RRQ; 
+                case "WRQ":     return WRQ;
+                case "LOGRQ":   return LOGRQ;
+                case "DELRQ":   return DELRQ;
+                case "DISC":    return DISC;
+                case "DIRQ":    return DIRQ;
+                default:        return UNKNOWN;
+            }
+        }
+
         public static Opcode fromBytes(byte a, byte b) { 
             return fromInt((short) (((short) a) << 8 | (short) (b) & 0x00ff));
         }

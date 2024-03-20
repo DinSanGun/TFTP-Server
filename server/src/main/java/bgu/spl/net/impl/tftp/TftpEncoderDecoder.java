@@ -8,7 +8,7 @@ import bgu.spl.net.api.MessageEncoderDecoder;
 public class TftpEncoderDecoder implements MessageEncoderDecoder<byte[]> {
 
     private List<Byte> bytes = new ArrayList<Byte>();
-    private byte op_code = 0;
+    private short op_code = 0;
     private boolean messageEndsWithZero = true;
     private boolean messageEnded = false;
     private short dataBytesLeft;
