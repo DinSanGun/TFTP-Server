@@ -49,7 +49,7 @@ public class TftpEncoderDecoder implements MessageEncoderDecoder<byte[]> {
                     return null; //incomplete message, continue collecting bytes
             case (9): //broadcast message
             case (5): //error message
-                if (bytesList.size() > 3) {
+                if (bytesList.size() > 3) { //3rd byte of error message might be zero-byte
                     if (nextByte == 0)
                         return bytesToArray(); //complete message received
                     else
@@ -58,8 +58,8 @@ public class TftpEncoderDecoder implements MessageEncoderDecoder<byte[]> {
         }
 
         // If the next byte is zero, it indicates the end of a message
-        if (nextByte == 0)
-            return bytesToArray(); // Complete message received
+        // if (nextByte == 0)
+        //     return bytesToArray(); // Complete message received
 
         return null; //incomplete message, continue collecting bytes
     }
@@ -74,11 +74,19 @@ public class TftpEncoderDecoder implements MessageEncoderDecoder<byte[]> {
     // Convert bytes list to byte array and clear list for next message
     private byte[] bytesToArray() {
         byte[] result = new byte[bytesList.size()];
+        
         int i = 0;
         for (Byte b : bytesList) {
             result[i] = b;
             i++;
         }
+
+        System.out.println("Message from server (inside encdec): ");
+        System.out.print("[");
+        for(int j = 0; j < result.length; j++)
+            System.out.print(result[j] + " ");
+        System.out.print("]");
+        System.out.println();
 
         bytesList.clear(); //clear the bytes list for the next message
         this.opCode = -1; //reset OpCode

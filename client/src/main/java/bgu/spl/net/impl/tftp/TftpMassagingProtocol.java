@@ -101,6 +101,7 @@ public class TftpMassagingProtocol implements MessagingProtocol<byte[]> {
 
     @Override
     public byte[] process(byte[] message) {
+
         Opcode opcode = Opcode.extract(message);
         byte[] response = null;
 
