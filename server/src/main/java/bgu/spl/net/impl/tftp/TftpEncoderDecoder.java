@@ -11,7 +11,6 @@ public class TftpEncoderDecoder implements MessageEncoderDecoder<byte[]> {
     private byte op_code = 0;
     private boolean messageEndsWithZero = true;
     private boolean messageEnded = false;
-    private byte[] dataLengthInBytes = new byte[2];
     private short dataBytesLeft;
 
     @Override
@@ -40,12 +39,9 @@ public class TftpEncoderDecoder implements MessageEncoderDecoder<byte[]> {
 
 
         //DATA packets length calculation
-        if(bytes.size() == 3 && op_code == 3) //First byte that represents the length of the data
-            dataLengthInBytes[0] = nextByte;           // in a DATA packet
-        if(bytes.size() == 4 && op_code == 3) { //Second byte that represents the length of the data
-            dataLengthInBytes[1] = nextByte;       // in a DATA packet
+        if(bytes.size() == 4 && op_code == 3) { 
             //2-Bytes to short convertion
-            dataBytesLeft = (short) ( ( (short) dataLengthInBytes[0] ) << 8  | (short) (dataLengthInBytes[1]) );
+            dataBytesLeft = (short) ( ( (short) bytes.get(2) ) << 8  | (short) (bytes.get(3)) );
         }
 
         if(bytes.size() > 6 && op_code == 3) { //Checking if DATA packet has ended, 

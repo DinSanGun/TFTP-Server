@@ -21,14 +21,30 @@ public class TftpMassagingProtocol implements MessagingProtocol<byte[]> {
     private ArrayDeque<Byte> currentDir = new ArrayDeque<>();
     String lastArg;
 
-    private enum Opcode { // Enum representing supported TFTP opcodes
-        RRQ(1), WRQ(2), DATA(3), ACK(4), ERROR(5), DIRQ(6), LOGRQ(7), DELRQ(8), BCAST(9), DISC(10), UNKNOWN(-1);
+    //-----------------------------------ENUMS---------------------------------//
+
+    public enum Opcode { // Enum representing supported TFTP opcodes
+        RRQ(1), 
+        WRQ(2), 
+        DATA(3), 
+        ACK(4), 
+        ERROR(5), 
+        DIRQ(6), 
+        LOGRQ(7), 
+        DELRQ(8), 
+        BCAST(9), 
+        DISC(10), 
+        UNKNOWN(-1);
         
         private final short value;
 
-        Opcode(int value) { this.value = (short) value;}
+        Opcode(int value) {
+            this.value = (short) value;
+        }
 
-        public byte[] toBytes() { return new byte[]{(byte) (value >> 8), (byte) (value & 0xff)};}
+        public byte[] toBytes() { 
+            return new byte[]{(byte) (value >> 8), (byte) (value & 0xff)};
+        }
 
         public static Opcode fromInt(int value) {
             for (Opcode opcode : Opcode.values()) {
@@ -39,15 +55,35 @@ public class TftpMassagingProtocol implements MessagingProtocol<byte[]> {
             return UNKNOWN;
         }
 
-        public static Opcode fromBytes(byte a, byte b) { return fromInt((short) (((short) a) << 8 | (short) (b) & 0x00ff));}
+        public static Opcode fromBytes(byte a, byte b) { 
+            return fromInt((short) (((short) a) << 8 | (short) (b) & 0x00ff));
+        }
 
-        public static Opcode extract(byte[] msg) { return fromBytes(msg[0], msg[1]); }
+        public static Opcode extract(byte[] msg) { 
+            return fromBytes(msg[0], msg[1]); 
+        }
     }
 
-    // Error messages
-    private static final byte[] NOT_DEFINED = "Not defined".getBytes(StandardCharsets.UTF_8);
-    private static final byte[] FILE_NOT_FOUND = "File not found".getBytes(StandardCharsets.UTF_8);
-    private static final byte[] ILLEGAL_OP = "Illegal operation".getBytes(StandardCharsets.UTF_8);
+    public enum TftpError {
+        NOT_DEFINED("Not defined"),
+        FILE_NOT_FOUND("File not found"),
+        ACCESS_VIOLATION("Access violation"),
+        DISC_FULL("Disk full or allocation exceeded"),
+        ILLEGAL_OP("Illegal TFTP operation"),
+        FILE_EXISTS("File already exists"),
+        NOT_LOGGED_IN("User not logged in"),
+        ALR_LOGGED_IN("User already logged in");
+
+        private final byte[] messageBytes;
+
+        TftpError(String message) {
+            this.messageBytes = message.getBytes(StandardCharsets.UTF_8);
+        }
+
+        public byte[] getMessageBytes() {
+            return messageBytes;
+        }
+    }
 
 
     @Override
@@ -69,7 +105,7 @@ public class TftpMassagingProtocol implements MessagingProtocol<byte[]> {
                 handleBroadcast(message);
                 break;
             case UNKNOWN:
-                response = createErrorMessage(NOT_DEFINED);
+                response = createErrorMessage(TftpError.NOT_DEFINED);
                 break;
             case RRQ:
             case WRQ:
@@ -82,21 +118,24 @@ public class TftpMassagingProtocol implements MessagingProtocol<byte[]> {
     }
 
     @Override
-    public boolean shouldTerminate() { return terminate; }
+    public boolean shouldTerminate() { 
+        return terminate; 
+    }
 
-    private byte[] createErrorMessage(byte[] err) {
-        byte[] pac = new byte[5 + err.length];
+    private byte[] createErrorMessage(TftpError error) {
+        byte[] pac = new byte[5 + error.getMessageBytes().length];
 
         pac[0] = Opcode.ERROR.toBytes()[0];
         pac[1] = Opcode.ERROR.toBytes()[1];
-        pac[2] = NOT_DEFINED[0];
-        pac[3] = NOT_DEFINED[1];
+        pac[2] = TftpError.NOT_DEFINED.getMessageBytes()[0];
+        pac[3] = TftpError.NOT_DEFINED.getMessageBytes()[1];
 
-        System.arraycopy(err, 0, pac, 4, err.length);
+        System.arraycopy(error.getMessageBytes(), 0, pac, 4, error.getMessageBytes().length);
         pac[pac.length - 1] = 0;
 
         return pac;
     }
+
 
     private byte[] handleAck(byte[] message) {
         short ackBlock = (short) ((message[2] << 8) | (message[3] & 0xFF));
@@ -106,7 +145,7 @@ public class TftpMassagingProtocol implements MessagingProtocol<byte[]> {
         if (ackBlock == 0)
             cmdOpcode = lastOpcode;
         else if (packets.isEmpty())
-            return createErrorMessage(NOT_DEFINED);
+            return createErrorMessage(TftpError.NOT_DEFINED);
         else {
             lastPacket = packets.peek();
             cmdOpcode = Opcode.extract(lastPacket);
@@ -119,7 +158,7 @@ public class TftpMassagingProtocol implements MessagingProtocol<byte[]> {
         byte[] response = null;
 
         if (packetBlock != ackBlock)
-            return createErrorMessage(NOT_DEFINED);
+            return createErrorMessage(TftpError.NOT_DEFINED);
 
         String filename;
 
@@ -147,7 +186,7 @@ public class TftpMassagingProtocol implements MessagingProtocol<byte[]> {
                 terminate = true;
                 break;
             default:
-                response = createErrorMessage(ILLEGAL_OP);
+                response = createErrorMessage(TftpError.ILLEGAL_OP);
                 break;
         }
 
@@ -159,7 +198,7 @@ public class TftpMassagingProtocol implements MessagingProtocol<byte[]> {
         File fileToSend = new File(directoryPath + File.separator + filename);
 
         if (!fileToSend.exists())
-            System.out.println(new String(FILE_NOT_FOUND, StandardCharsets.UTF_8));
+        System.out.println(new String(TftpError.FILE_NOT_FOUND.getMessageBytes(), StandardCharsets.UTF_8));
 
         try (FileInputStream fstream = new FileInputStream(fileToSend)) {
             ArrayDeque<Byte> packetData = new ArrayDeque<>();

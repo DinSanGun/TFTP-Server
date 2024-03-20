@@ -25,8 +25,8 @@ public class TftpEncoderDecoder implements MessageEncoderDecoder<byte[]> {
 
         if (bytesList.size() == 2) {
             //extract OpCode from the first two bytes
-            byte[] opCodeBytes = new byte[] { bytesList.get(0), bytesList.get(1) };
-            this.opCode = (short) (((short) opCodeBytes[0] ) << 8 | (short) (opCodeBytes[1] & 0xFF));
+            byte[] opCodeBytes = new byte[]{bytesList.get(0), bytesList.get(1)};
+            this.opCode = (short) (((short) opCodeBytes[0] & 0xFF) << 8 | (short) (opCodeBytes[1] & 0xFF));
         }
 
         //decode message based on OpCode

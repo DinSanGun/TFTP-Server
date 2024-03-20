@@ -13,11 +13,11 @@ public class TftpClient {
             args = new String[] { "localhost", "7777" };
 
         // Ensure that exactly two arguments are provided: host and port
-        else if (args.length < 2) {
+        if (args.length < 2) {
             System.out.println("you must supply two arguments: host, port");
             System.exit(1);
         }
-        
+
         // Extract host and port from the arguments
         String host = args[0];
         int port = Integer.parseInt(args[1]);
