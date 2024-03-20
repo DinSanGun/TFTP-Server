@@ -38,8 +38,6 @@ public class TftpKeyboardHandler implements Runnable {
             while (!protocol.shouldTerminate()) {
                 command = in.readLine();
 
-                System.out.println("Client entered: " + command);
-
                 if (command != null) {
                     encodedCommand = encodeCommand(command);
 
@@ -60,6 +58,8 @@ public class TftpKeyboardHandler implements Runnable {
                         }
                     }
                 }
+                else
+                    System.out.println("Error reading the command from prompt");
             }
 
             in.close();

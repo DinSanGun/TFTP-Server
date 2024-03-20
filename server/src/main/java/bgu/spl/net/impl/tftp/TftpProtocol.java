@@ -27,6 +27,7 @@ public class TftpProtocol implements BidiMessagingProtocol<byte[]>  {
     private List<Byte> directoryListingData;
     private boolean clientIsDownloading;
     private String uploadFileName;
+    protected short lastSentMessageOpCode;
 
     @Override
     public void start(int connectionId, Connections<byte[]> connections) {
@@ -37,6 +38,7 @@ public class TftpProtocol implements BidiMessagingProtocol<byte[]>  {
         directoryListingData = new LinkedList<Byte>();
         clientIsDownloading = false;
         uploadFileName = null;
+        lastSentMessageOpCode = -1;
     }
 
     @Override

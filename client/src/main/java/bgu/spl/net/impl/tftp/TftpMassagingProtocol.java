@@ -123,10 +123,10 @@ public class TftpMassagingProtocol implements MessagingProtocol<byte[]> {
                 break;
             case RRQ:
             case WRQ:
-                lastArg = new String(message, 2, message.length - 3, StandardCharsets.UTF_8);
-            default:
-                lastOpcode = opcode;
+                lastArg = new String(message, 2, message.length - 3, StandardCharsets.UTF_8);                
         }
+
+        lastOpcode = opcode; //Might be a problem
 
         return response;
     }
@@ -158,6 +158,7 @@ public class TftpMassagingProtocol implements MessagingProtocol<byte[]> {
 
         if (ackBlock == 0)
             cmdOpcode = lastOpcode;
+
         else if (packets.isEmpty())
             return createErrorMessage(TftpError.NOT_DEFINED);
         else {

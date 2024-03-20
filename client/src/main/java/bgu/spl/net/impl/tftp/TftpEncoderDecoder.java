@@ -9,19 +9,21 @@ public class TftpEncoderDecoder implements MessageEncoderDecoder<byte[]> {
     private List<Byte> bytesList;
     //OpCode for message identification
     private short opCode;
+    private int dataBytesLeft;
 
     public TftpEncoderDecoder() {
         this.bytesList = new LinkedList<>();
+        dataBytesLeft = 0;
     }
 
     @Override
     public byte[] decodeNextByte(byte nextByte) {
         //if the bytes list is empty, add the next byte
-        if (bytesList.isEmpty()) {
-            bytesList.add(nextByte);
-            return null; //Continue collecting bytes
-        } else
-            bytesList.add(nextByte);
+        bytesList.add(nextByte);
+
+        if(bytesList.size() == 1) //First byte does not provide us enough information
+            return null;
+
 
         if (bytesList.size() == 2) {
             //extract OpCode from the first two bytes
@@ -32,22 +34,23 @@ public class TftpEncoderDecoder implements MessageEncoderDecoder<byte[]> {
         //decode message based on OpCode
         switch (opCode) {
             case (3): //data message
-                if (bytesList.size() > 3) {
-                    byte[] sizeBytes = new byte[]{bytesList.get(2), bytesList.get(3)};
-                    int packetSize = (short) (((short) sizeBytes[0] & 0xFF) << 8 | (short) (sizeBytes[1] & 0xFF));
-                    if (bytesList.size() == packetSize + 6)
-                        return bytesToArray(); //complete message received
-                    else
-                        return null; //incomplete message, continue collecting bytes
+                if (bytesList.size() == 4) {
+                    byte[] sizeBytes = new byte[] { bytesList.get(2), bytesList.get(3) };
+                    int packetDataSize = (short) (((short) sizeBytes[0]) << 8 | (short) (sizeBytes[1] & 0xFF));
+                    dataBytesLeft = packetDataSize; //Saving data section size
                 }
+                else if(bytesList.size() > 6) { //Reading the data section
+                    dataBytesLeft--;
+                    if(dataBytesLeft == 0)
+                        return bytesToArray();
+                } 
+                return null;
+
             case (4): //acknowledgement message
-            case (10): //disconnect message
-            case (6): //directory inquiry message
-                if (bytesList.size() == 2)
-                    return bytesToArray(); //complete message received
-                else
-                    return null; //incomplete message, continue collecting bytes
-            case (9): //broadcast message
+                if(bytesList.size() == 4) 
+                    return bytesToArray();
+                break;
+
             case (5): //error message
                 if (bytesList.size() > 3) { //3rd byte of error message might be zero-byte
                     if (nextByte == 0)
@@ -55,11 +58,11 @@ public class TftpEncoderDecoder implements MessageEncoderDecoder<byte[]> {
                     else
                         return null; //incomplete message, continue collecting bytes
                 }
-        }
+                break;
 
-        // If the next byte is zero, it indicates the end of a message
-        // if (nextByte == 0)
-        //     return bytesToArray(); // Complete message received
+            case (9): //broadcast message
+
+        }
 
         return null; //incomplete message, continue collecting bytes
     }
