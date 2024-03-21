@@ -288,9 +288,9 @@ public class TftpProtocol implements BidiMessagingProtocol<byte[]>  {
         else {
             connections.send(connectionId, createACKPacket((short) 0));
             fileToDelete.delete();
+            System.out.println("File " + filename + " was deleted");
             byte deleted = 0;
             broadcast(filename, deleted);
-            System.out.println("File " + filename + " was deleted");
         }
     }   
 

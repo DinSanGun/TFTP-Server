@@ -61,7 +61,14 @@ public class TftpEncoderDecoder implements MessageEncoderDecoder<byte[]> {
                 break;
 
             case (9): //broadcast message
-
+                if (bytesList.size() > 3) { //3rd byte of error message might be zero-byte
+                    if (nextByte == 0)
+                        return bytesToArray(); //complete message received
+                    else
+                        return null; //incomplete message, continue collecting bytes
+                }
+                break;
+            default: System.out.println("Some error has occured when encoding message from server"); break;
         }
 
         return null; //incomplete message, continue collecting bytes
