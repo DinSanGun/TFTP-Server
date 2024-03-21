@@ -11,7 +11,7 @@ import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.IOException;
 
-public class TftpMassagingProtocol implements MessagingProtocol<byte[]> {
+public class TftpMessagingProtocol implements MessagingProtocol<byte[]> {
     private boolean terminate = false;
     private short lastBlock = 0;
     private Queue<byte[]> packets = new ConcurrentLinkedQueue<>();

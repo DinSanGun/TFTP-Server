@@ -9,7 +9,7 @@ import java.net.Socket;
 import java.nio.charset.StandardCharsets;
 
 import bgu.spl.net.api.MessagingProtocol;
-import bgu.spl.net.impl.tftp.TftpMassagingProtocol.TftpError;
+import bgu.spl.net.impl.tftp.TftpMessagingProtocol.TftpError;
 
 public class TftpKeyboardHandler implements Runnable {
     private BufferedOutputStream out;
@@ -48,7 +48,7 @@ public class TftpKeyboardHandler implements Runnable {
 
                         // if the user requested to disconnect, wait until the server send an answer
                         // that way, the thread won't get stuck on readline
-                        if (TftpMassagingProtocol.Opcode.extract(encodedCommand) == TftpMassagingProtocol.Opcode.DISC) {
+                        if (TftpMessagingProtocol.Opcode.extract(encodedCommand) == TftpMessagingProtocol.Opcode.DISC) {
                             try {
                                 synchronized (discLock) {
                                     discLock.wait();
@@ -96,7 +96,7 @@ public class TftpKeyboardHandler implements Runnable {
         String[] args = command.split(" ");
         String opcodeValue = args[0];
 
-        TftpMassagingProtocol.Opcode code = TftpMassagingProtocol.Opcode.fromString(opcodeValue);
+        TftpMessagingProtocol.Opcode code = TftpMessagingProtocol.Opcode.fromString(opcodeValue);
         byte[] encodedCommand = null;
         String arg = args.length > 1 ? command.substring(args[0].length() + 1) : "";
         byte[] encodedArg = arg.getBytes(StandardCharsets.UTF_8);
@@ -151,7 +151,7 @@ public class TftpKeyboardHandler implements Runnable {
      * @param code
      * @return encoded command packet.
      */
-    private byte[] encapsulate(byte[] encodedArg, TftpMassagingProtocol.Opcode code) {
+    private byte[] encapsulate(byte[] encodedArg, TftpMessagingProtocol.Opcode code) {
         byte[] encodedMessage = new byte[3 + encodedArg.length];
 
         encodedMessage[0] = code.toBytes()[0];

@@ -84,13 +84,6 @@ public class TftpEncoderDecoder implements MessageEncoderDecoder<byte[]> {
             i++;
         }
 
-        System.out.println("Message from server (inside encdec): ");
-        System.out.print("[");
-        for(int j = 0; j < result.length; j++)
-            System.out.print(result[j] + " ");
-        System.out.print("]");
-        System.out.println();
-
         bytesList.clear(); //clear the bytes list for the next message
         this.opCode = -1; //reset OpCode
         return result;

@@ -15,13 +15,19 @@ public class TftpServer {
             Supplier< BidiMessagingProtocol <byte[]> > protocolFactory = () -> new TftpProtocol();
             Supplier< MessageEncoderDecoder <byte[]> > encdecFactory = TftpEncoderDecoder::new;
             Connections<byte[]> connections = new ConnectionsImpl<byte[]>();
+            int port;
+
+            if(args.length != 0)
+                port = Integer.parseInt(args[0]);
+            else
+                port = 7777; //Default port
 
         // you can use any server... 
         Server.<byte[]>threadPerClient(
-                7777, //port
+                port, //port
                 protocolFactory, //protocol factory
                 encdecFactory, //message encoder decoder factory
-                connections
+                connections //An object to manage and handle the multiple clients' connections to the server.
         ).serve();
 
     }

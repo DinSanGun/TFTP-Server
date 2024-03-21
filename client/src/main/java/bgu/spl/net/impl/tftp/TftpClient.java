@@ -29,7 +29,7 @@ public class TftpClient {
             sock = new Socket(host, port);
 
             // Create an instance of the TFTP messaging protocol
-            MessagingProtocol<byte[]> protocol = new TftpMassagingProtocol();
+            MessagingProtocol<byte[]> protocol = new TftpMessagingProtocol();
 
             // Create an instance of the TFTP message encoder/decoder
             MessageEncoderDecoder<byte[]> encdec = new TftpEncoderDecoder();

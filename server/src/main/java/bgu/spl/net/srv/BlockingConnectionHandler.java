@@ -14,7 +14,7 @@ public class BlockingConnectionHandler<T> implements Runnable, ConnectionHandler
     private final Socket sock;
     private BufferedInputStream in;
     private BufferedOutputStream out;
-    protected volatile boolean connected; //For what?
+    protected volatile boolean connected;
     private final Connections<T> connections;
 
     public BlockingConnectionHandler(Socket sock, MessageEncoderDecoder<T> reader, BidiMessagingProtocol<T> protocol, Connections<T> connections) {
@@ -25,6 +25,7 @@ public class BlockingConnectionHandler<T> implements Runnable, ConnectionHandler
         connected = false;
     }
 
+    
     @Override
     public void run() {
 
@@ -60,23 +61,23 @@ public class BlockingConnectionHandler<T> implements Runnable, ConnectionHandler
 
     }
 
+    /**
+     * A method that closes the connection between the server and the represented client.
+     */
     @Override
     public void close() throws IOException {
         connected = false;
         sock.close();
     }
 
+    /**
+     * A method that sends a message 'msg' to the represented client.
+     */
     @Override
     public void send(T msg) {
         if (msg != null) {
             try{
-                byte[] message = encdec.encode(msg);
-                // System.out.print("[ "); TESTING
-                // for(int i = 0; i < message.length; i++)
-                //     System.out.print(message[i] + " ");
-                // System.out.print("]");
-
-                out.write(message);
+                out.write(encdec.encode(msg));
                 out.flush(); 
             } catch(IOException ex){
                 ex.printStackTrace();

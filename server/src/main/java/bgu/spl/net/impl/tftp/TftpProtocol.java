@@ -27,6 +27,7 @@ public class TftpProtocol implements BidiMessagingProtocol<byte[]>  {
     private List<Byte> directoryListingData;
     private boolean clientIsDownloading;
     private String uploadFileName;
+    private String username;
 
     @Override
     public void start(int connectionId, Connections<byte[]> connections) {
@@ -45,8 +46,10 @@ public class TftpProtocol implements BidiMessagingProtocol<byte[]>  {
         byte op_code = message[1]; //The op code is represented by the first 2 bytes -
                                 // first of them is zero according to the instructions
 
-        if(op_code != 7 && !connections.isLoggedIn(connectionId))  //User not logged in and trying to make requests to server
+        if(op_code != 7 && !connections.isLoggedIn(connectionId)) { //User not logged in and trying to make requests to server
                 connections.send(connectionId, errorPacket(6));
+                System.out.println("Unknown client is trying to reach the server (ERROR-6)");
+        }
 
         else {
 
@@ -78,6 +81,8 @@ public class TftpProtocol implements BidiMessagingProtocol<byte[]>  {
         byte[] filenameInBytes = Arrays.copyOfRange(message, 2, message.length - 1);
         String filename = new String(filenameInBytes , StandardCharsets.UTF_8);
 
+        System.out.println("Client " + username + " asks to download: " + filename);
+
         try{
             fileToDownloadFromServer = new FileInputStream("Files/" + filename);
         }
@@ -85,6 +90,8 @@ public class TftpProtocol implements BidiMessagingProtocol<byte[]>  {
             connections.send(connectionId, errorPacket(1));
             return;
         }
+
+        System.out.println("Client " + username + " starts downloading");
         
         waitingForAckBlockNumber = 0;
         clientIsDownloading = true;
@@ -97,10 +104,14 @@ public class TftpProtocol implements BidiMessagingProtocol<byte[]>  {
         byte[] filenameInBytes = Arrays.copyOfRange(message, 2, message.length - 1);
         String filename = new String(filenameInBytes , StandardCharsets.UTF_8);
 
+        System.out.println("Client " + username + " asks to upload: " + filename);
+
         File fileToCreate = new File("Files/" + filename);
 
-        if(fileToCreate.exists()) 
+        if(fileToCreate.exists()) {
             connections.send(connectionId, errorPacket(5));
+            System.out.println("File - " + filename + " - does not exist in the server");
+        }
         else {
             try {
                 fileToCreate.createNewFile();
@@ -110,6 +121,7 @@ public class TftpProtocol implements BidiMessagingProtocol<byte[]>  {
             } 
             uploadFileName = filename;
             connections.send(connectionId, createACKPacket((short) 0));
+            System.out.println("Client " + username + " is uploading the file: " + filename);
         }
     }
 
@@ -134,6 +146,7 @@ public class TftpProtocol implements BidiMessagingProtocol<byte[]>  {
         connections.send(connectionId, createACKPacket(packetBlockNumber));
 
         if(dataSectionSize < DATA_PACKET_MAX_SIZE) { //It means this is the last data packet
+            System.out.println("Upload of" + uploadFileName + " has completed");
             broadcast(uploadFileName, (byte) 1);
             uploadFileName = null;
             try {
@@ -148,6 +161,7 @@ public class TftpProtocol implements BidiMessagingProtocol<byte[]>  {
         if(waitingForAckBlockNumber != -1) {
             short ACKBlockNumber = (short) ( ((short) packet[2]) << 8 | (short) (packet[3]) & 0xff);
             if(waitingForAckBlockNumber == ACKBlockNumber) {
+                System.out.println("Client " + username + " has received packet #" + ACKBlockNumber);
                 if(clientIsDownloading)
                     sendNextFilePacket();
                 else
@@ -179,6 +193,7 @@ public class TftpProtocol implements BidiMessagingProtocol<byte[]>  {
         else {
             waitingForAckBlockNumber = -1;
             clientIsDownloading = false;
+            System.out.println("Client " + username + " finished downloading file");
 
             try {
                 fileToDownloadFromServer.close();
@@ -197,6 +212,8 @@ public class TftpProtocol implements BidiMessagingProtocol<byte[]>  {
         String nextFilename;
         byte[] nextFilenameInBytes;
         byte separator = 0;
+
+        System.out.println("Client " + username + " asked for a directory list");
 
         while(!filenames.isEmpty()) {
 
@@ -248,10 +265,11 @@ public class TftpProtocol implements BidiMessagingProtocol<byte[]>  {
 
         if( connections.login(connectionId , username) ) { //Login succeeded
             System.out.println(username + " is connected");
-            byte[] ack = createACKPacket((short) 0);
             connections.send(connectionId, createACKPacket((short) 0));
+            this.username = username;
         }
         else { //Create and send error packet
+            System.out.println(username + " failed to connect");
             connections.send(connectionId, errorPacket(7)); //User already logged in
         }
     }
@@ -260,6 +278,8 @@ public class TftpProtocol implements BidiMessagingProtocol<byte[]>  {
     private void deleteFile(byte[] message) {
         byte[] filenameInBytes = Arrays.copyOfRange(message, 2, message.length - 1);
         String filename = new String(filenameInBytes , StandardCharsets.UTF_8);
+
+        System.out.println("Client " + username + " requesting to delete: " + filename);
 
         File fileToDelete = new File("Files/" + filename);
 
@@ -270,6 +290,7 @@ public class TftpProtocol implements BidiMessagingProtocol<byte[]>  {
             fileToDelete.delete();
             byte deleted = 0;
             broadcast(filename, deleted);
+            System.out.println("File " + filename + " was deleted");
         }
     }   
 
@@ -287,6 +308,7 @@ public class TftpProtocol implements BidiMessagingProtocol<byte[]>  {
         BCASTPacket[2] = deleted_added;
         System.arraycopy(filenameAsBytes, 0, BCASTPacket, 3, filenameAsBytes.length);
         connections.sendAll(BCASTPacket);
+        System.out.println("A broadcast message has been sent to all active clients");
     }
 
     /**
@@ -297,6 +319,7 @@ public class TftpProtocol implements BidiMessagingProtocol<byte[]>  {
             connections.send(connectionId, createACKPacket((short) 0));
             shouldTerminate = true;
             connections.disconnect(connectionId);
+            System.out.println("Client " + username + " has disconnected");
         }
         else {                                                 //User has not logged in yet
             connections.send(connectionId, errorPacket(6));
