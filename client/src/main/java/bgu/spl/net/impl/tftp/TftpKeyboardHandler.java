@@ -30,7 +30,7 @@ public class TftpKeyboardHandler implements Runnable {
 
     @Override
     public void run() {
-        System.out.println("Started input handler");
+        System.out.println("=== Client started ===");
         String command; // the command from the user
         byte[] encodedCommand;
 

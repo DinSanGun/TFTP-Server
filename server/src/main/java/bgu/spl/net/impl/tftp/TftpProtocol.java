@@ -27,7 +27,6 @@ public class TftpProtocol implements BidiMessagingProtocol<byte[]>  {
     private List<Byte> directoryListingData;
     private boolean clientIsDownloading;
     private String uploadFileName;
-    protected short lastSentMessageOpCode;
 
     @Override
     public void start(int connectionId, Connections<byte[]> connections) {
@@ -38,18 +37,10 @@ public class TftpProtocol implements BidiMessagingProtocol<byte[]>  {
         directoryListingData = new LinkedList<Byte>();
         clientIsDownloading = false;
         uploadFileName = null;
-        lastSentMessageOpCode = -1;
     }
 
     @Override
     public void process(byte[] message) {
-
-        System.out.println("TFTP Protocol got");
-        System.out.print("[ ");
-        for(int i = 0; i < message.length; i++)
-            System.out.print(message[i] + " ");
-        System.out.print("]");
-        System.out.println();
 
         byte op_code = message[1]; //The op code is represented by the first 2 bytes -
                                 // first of them is zero according to the instructions
